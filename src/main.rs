@@ -114,7 +114,6 @@ fn main() {
                     is_slime_chunk(seed, key.0, key.1)
                 })
                 .count();
-            // progress.lock().unwrap().inc_and_draw(&bar, 1);
             (chunk, slime_chunk_count)
         })
         .collect();
