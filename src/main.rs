@@ -1,4 +1,9 @@
-use std::{collections::HashSet, num::Wrapping, sync::Mutex, time::Instant};
+use std::{
+    collections::{HashMap, HashSet},
+    num::Wrapping,
+    sync::Mutex,
+    time::Instant,
+};
 
 use javarandom::JavaRandom;
 use linya::{Bar, Progress};
@@ -102,6 +107,8 @@ fn main() {
         elapsed
     );
 
+    let mut cache: HashMap<(i32, i32), bool> = HashMap::new();
+
     let progress = Mutex::new(Progress::new());
     let bar: Bar = progress.lock().unwrap().bar(spiral.len(), "Seaching...");
 
@@ -114,7 +121,10 @@ fn main() {
                 .filter(|&&offset| {
                     let (x, z) = chunk;
                     let (ox, oz) = offset;
-                    is_slime_chunk(seed, x + ox, z + oz)
+                    let chunk = (x + ox, z + oz);
+                    *cache
+                        .entry(chunk)
+                        .or_insert(is_slime_chunk(seed, chunk.0, chunk.1))
                 })
                 .count();
             progress.lock().unwrap().inc_and_draw(&bar, 1);
