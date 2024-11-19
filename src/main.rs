@@ -1,9 +1,24 @@
-use std::{collections::HashSet, num::Wrapping, sync::Mutex, time::Instant};
+use clap::Parser;
+
+use rayon::prelude::*;
+use std::{collections::HashSet, num::Wrapping, time::Instant};
 
 use javarandom::JavaRandom;
-use linya::{Bar, Progress};
 
 mod javarandom;
+
+/// Simple program to greet a person
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Seed to find slime chunks
+    #[arg(short, long)]
+    seed: i64,
+
+    /// Number of range to search from the center chunk
+    #[arg(short, long, default_value_t = 5000)]
+    range: u32,
+}
 
 fn generate_spiral(x_max: i32, y_max: i32) -> Vec<(i32, i32)> {
     let (mut x, mut y) = (0, 0);
@@ -67,6 +82,75 @@ fn is_slime_chunk(seed: i64, x: i32, z: i32) -> bool {
     rng.next_int(10) == 0
 }
 
+fn main() {
+    let args = Args::parse();
+
+    let seed = args.seed;
+    let size = args.range as i32;
+
+    println!("Seed: {}", seed);
+    println!("Range: {}", size);
+
+    let start = Instant::now();
+    let spiral = generate_spiral(size, size);
+    let offsets = generate_in_despawn_range_offsets(7);
+    let elapsed = start.elapsed();
+    println!(
+        "Time elapsed in generating spiral and offsets: {:?}",
+        elapsed
+    );
+
+    let start = Instant::now();
+    let mut nums: Vec<((i32, i32), usize)> = spiral
+        .par_iter()
+        .map(|&chunk| {
+            let slime_chunk_count = offsets
+                .par_iter()
+                .filter(|&&offset| {
+                    let (x, z) = chunk;
+                    let (ox, oz) = offset;
+                    let key = (x + ox, z + oz);
+
+                    is_slime_chunk(seed, key.0, key.1)
+                })
+                .count();
+            // progress.lock().unwrap().inc_and_draw(&bar, 1);
+            (chunk, slime_chunk_count)
+        })
+        .collect();
+    let elapsed = start.elapsed();
+    println!("Time elapsed in counting slime chunks: {:?}", elapsed);
+
+    nums.sort_by_key(|&(_, count)| count);
+    nums.reverse();
+
+    for (chunk, count) in nums.iter().take(10) {
+        println!("Chunk {:?} has {} slime chunks", chunk, count);
+    }
+
+    let max_chunk = nums.iter().max_by_key(|&(_, count)| count).unwrap();
+    println!(
+        "Max slime chunk is {:?} with count {}",
+        max_chunk.0, max_chunk.1
+    );
+
+    let slime_chunks: Vec<(i32, i32)> = offsets
+        .iter()
+        .filter_map(|&offset| {
+            let (x, z) = max_chunk.0;
+            let (ox, oz) = offset;
+            let result = is_slime_chunk(seed, x + ox, z + oz);
+            if result {
+                Some((x + ox, z + oz))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    println!("Slime chunks: {:?}", slime_chunks);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,64 +171,4 @@ mod tests {
         assert!(is_slime_chunk(8011883210394390920, -1, 0));
         assert!(!is_slime_chunk(8011883210394390920, 0, 0));
     }
-}
-
-fn main() {
-    let seed = 8011883210394390920;
-    let size = 10000;
-
-    let start = Instant::now();
-    let spiral = generate_spiral(size, size);
-    let offsets = generate_in_despawn_range_offsets(7);
-    let elapsed = start.elapsed();
-    println!(
-        "Time elapsed in generating spiral and offsets: {:?}",
-        elapsed
-    );
-
-    let progress = Mutex::new(Progress::new());
-    let bar: Bar = progress.lock().unwrap().bar(spiral.len(), "Seaching...");
-
-    let start = Instant::now();
-    let mut nums: Vec<((i32, i32), usize)> = spiral
-        .iter()
-        .map(|&chunk| {
-            let slime_chunk_count = offsets
-                .iter()
-                .filter(|&&offset| {
-                    let (x, z) = chunk;
-                    let (ox, oz) = offset;
-                    is_slime_chunk(seed, x + ox, z + oz)
-                })
-                .count();
-            progress.lock().unwrap().inc_and_draw(&bar, 1);
-            (chunk, slime_chunk_count)
-        })
-        .collect();
-    let elapsed = start.elapsed();
-    println!("Time elapsed in counting slime chunks: {:?}", elapsed);
-
-    nums.sort_by_key(|&(_, count)| count);
-    nums.reverse();
-
-    for (chunk, count) in nums.iter().take(10) {
-        println!("Chunk {:?} has {} slime chunks", chunk, count);
-    }
-
-    let max_chunk = nums.iter().max_by_key(|&(_, count)| count).unwrap();
-    println!(
-        "Max slime chunk is {:?} with count {}",
-        max_chunk.0, max_chunk.1
-    );
-
-    offsets.iter().for_each(|&offset| {
-        let (x, z) = max_chunk.0;
-        let (ox, oz) = offset;
-        let result = is_slime_chunk(seed, x + ox, z + oz);
-        if result {
-            println!("({}, {}): true", x + ox, z + oz);
-        }
-    });
-
-    // println!("{:?}", spiral);
 }
