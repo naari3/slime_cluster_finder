@@ -13,7 +13,7 @@ mod javarandom;
 struct Args {
     /// Seed to find slime chunks
     #[arg(short, long)]
-    seed: i64,
+    seed: String,
 
     /// Number of range to search from the center chunk
     #[arg(short, long, default_value_t = 5000)]
@@ -82,10 +82,29 @@ fn is_slime_chunk(seed: i64, x: i32, z: i32) -> bool {
     rng.next_int(10) == 0
 }
 
+trait ToHash {
+    fn to_hash(&self) -> i64;
+}
+
+impl ToHash for str {
+    fn to_hash(&self) -> i64 {
+        if let Ok(value) = self.parse::<i64>() {
+            return value;
+        }
+        let mut hash: i64 = 0;
+        let length = self.len();
+
+        for (i, c) in self.chars().enumerate() {
+            hash += (c as i64) * 31_i64.pow((length - 1 - i) as u32);
+        }
+
+        (hash & 0xFFFFFFFF) as _
+    }
+}
+
 fn main() {
     let args = Args::parse();
-
-    let seed = args.seed;
+    let seed: i64 = args.seed.to_hash();
     let size = args.range as i32;
 
     println!("Seed: {}", seed);
