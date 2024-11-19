@@ -104,14 +104,21 @@ impl ToHash for str {
 
 fn main() {
     let args = Args::parse();
-    let seed: i64 = args.seed.to_hash();
-    let size = args.range as i32;
+    let raw_seed = args.seed.clone();
+    let seed: i64 = raw_seed.to_hash();
+    let range = args.range as i32;
 
-    println!("Seed: {}", seed);
-    println!("Range: {}", size);
+    let mut formatted_seed = format!("{seed}");
+    if raw_seed != formatted_seed {
+        formatted_seed = format!("{seed} ({raw_seed})");
+    }
+    let formatted_range = format!("(-{range}, -{range}) ~ ({range}, {range})");
+
+    println!("Seed: {formatted_seed}");
+    println!("Range: {formatted_range}",);
 
     let start = Instant::now();
-    let spiral = generate_spiral(size, size);
+    let spiral = generate_spiral(range, range);
     let offsets = generate_in_despawn_range_offsets(7);
     let elapsed = start.elapsed();
     println!(
@@ -142,10 +149,13 @@ fn main() {
     nums.sort_by_key(|&(_, count)| count);
     nums.reverse();
 
+    println!();
+    println!("Top 10 slime chunks:");
     for (chunk, count) in nums.iter().take(10) {
         println!("Chunk {:?} has {} slime chunks", chunk, count);
     }
 
+    println!();
     let max_chunk = nums.iter().max_by_key(|&(_, count)| count).unwrap();
     println!(
         "Max slime chunk is {:?} with count {}",
@@ -157,12 +167,7 @@ fn main() {
         .filter_map(|&offset| {
             let (x, z) = max_chunk.0;
             let (ox, oz) = offset;
-            let result = is_slime_chunk(seed, x + ox, z + oz);
-            if result {
-                Some((x + ox, z + oz))
-            } else {
-                None
-            }
+            is_slime_chunk(seed, x + ox, z + oz).then_some((x + ox, z + oz))
         })
         .collect();
 
