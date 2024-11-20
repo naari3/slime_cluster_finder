@@ -9,7 +9,7 @@ use javarandom::JavaRandom;
 mod javarandom;
 mod plot;
 
-/// Simple program to greet a person
+/// Find slime chunks cluster in Minecraft
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
