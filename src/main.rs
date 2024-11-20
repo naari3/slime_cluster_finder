@@ -1,11 +1,13 @@
 use clap::Parser;
 
+use plot::plot;
 use rayon::prelude::*;
 use std::{collections::HashSet, num::Wrapping, time::Instant};
 
 use javarandom::JavaRandom;
 
 mod javarandom;
+mod plot;
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
@@ -18,6 +20,14 @@ struct Args {
     /// Number of range to search from the center chunk
     #[arg(short, long, default_value_t = 5000)]
     range: u32,
+
+    /// Number of lines to print
+    #[arg(short = 'n', long, default_value_t = 10)]
+    lines: usize,
+
+    /// Number of plots to generate
+    #[arg(short, long, default_value_t = 10000)]
+    plots: usize,
 }
 
 fn generate_spiral(x_max: i32, y_max: i32) -> Vec<(i32, i32)> {
@@ -107,6 +117,8 @@ fn main() {
     let raw_seed = args.seed.clone();
     let seed: i64 = raw_seed.to_hash();
     let range = args.range as i32;
+    let lines = args.lines;
+    let plots = args.plots;
 
     let mut formatted_seed = format!("{seed}");
     if raw_seed != formatted_seed {
@@ -150,8 +162,8 @@ fn main() {
     nums.reverse();
 
     println!();
-    println!("Top 10 slime chunks:");
-    for (chunk, count) in nums.iter().take(10) {
+    println!("Top {lines} slime chunks:");
+    for (chunk, count) in nums.iter().take(lines) {
         println!("Chunk {:?} has {} slime chunks", chunk, count);
     }
 
@@ -162,7 +174,7 @@ fn main() {
         max_chunk.0, max_chunk.1
     );
 
-    let slime_chunks: Vec<(i32, i32)> = offsets
+    let mut slime_chunks: Vec<(i32, i32)> = offsets
         .iter()
         .filter_map(|&offset| {
             let (x, z) = max_chunk.0;
@@ -170,8 +182,11 @@ fn main() {
             is_slime_chunk(seed, x + ox, z + oz).then_some((x + ox, z + oz))
         })
         .collect();
+    slime_chunks.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
 
     println!("Slime chunks: {:?}", slime_chunks);
+
+    plot(&nums[0..plots], seed).unwrap();
 }
 
 #[cfg(test)]
